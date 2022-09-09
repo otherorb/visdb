@@ -26,6 +26,8 @@
 # top level of this library.
 
 import argparse
+import sys
+import os
 import sqlalchemy as sql
 from sqlalchemy import orm
 from sqlalchemy import Integer, String, Text, Column, Boolean, Float, Identity, DateTime
@@ -40,6 +42,11 @@ from sqlalchemy.ext.declarative import as_declarative, declared_attr
 Base = orm.declarative_base()
 
 class Raw_Product(Base):
+    """ Note that SQLAlchemy will default the table name to the name of the 
+    class. We want the class to provide a single instance (object) whereas
+    the table is the full table of all of these objects. To that end, we
+    use the plural for the table name and the singular for the class name.
+    """
     __tablename__ = 'Raw_Products'
 
     """ It's not clear whether I should use CheckConstraint or a validator.
@@ -65,6 +72,7 @@ class Raw_Product(Base):
     instrument_name = Column(String, nullable=False)
     start_time = Column(DateTime, nullable=False)
     stop_time = Column(DateTime, nullable=False)
+    observation_lid = Column(String, nullable=False)
     mission_lid = Column(String, nullable=False)
     sc_lid = Column(String, nullable=False)
     bad_pixel_table_id = Column(Integer, nullable=False)
@@ -78,9 +86,11 @@ class Raw_Product(Base):
     HazLight_X_On = Column(Boolean, nullable=False)
     HazLight_Y_On = Column(Boolean, nullable=False)
     HazLight_Z_On = Column(Boolean, nullable=False)
+    purpose = Column(String, nullable=False)
     compression_type = Column(String, nullable=False)
     compression_ratio = Column(Float, nullable=False)
     instrument_temperature = Column(Float, nullable=False)
+    purpose = Column(String, nullable=False)
     mission_phase = Column(String, nullable=False)
     software_name = Column(String, nullable=False)
     software_version = Column(String, nullable=False)
@@ -176,20 +186,43 @@ class Raw_Product(Base):
         return(compression_type)
     """
 
+
+
     def emit_pds_label():
+        """This should pull from Ross's code when it's been updated."""
         pass
 
-    def get_product_id():
-        pass
+    def product_id(self):
+        """Use the pid.py module to add methods and classes to 
+        this object.
+        """
+        sys.path.insert(1, os.path.join(sys.path[0],'../..'))
+        from vipersci.pds import pid
 
-    def set_product_id():
-        pass
+        """ Try to create an observation id using the start_time (datetime object)
+        and the instrument name"""
+        start_date = self.start_time.date()
+        start_hhmmss = self.start_time.time()
+        inst_name = self.instrument_name.lower()
 
-    def get_instrument_name():
-        pass
+        self.raw_product_id = pid.VISID(start_date, start_hhmmss, 
+                                inst_name, self.compression_type).__str__()
+        print(self.raw_product_id)
+        return(self.raw_product_id)
 
-    def set_instrument_name():
-        pass
+        """
+        This is opied from the pid.py module imported above, mostly for 
+        documentation purposes here.
+        :ivar date: a six digit string denoting YYMMDD (or strftime %y%m%d) where
+        the two digit year can be prefixed with "20" to get the four-digit year.
+        :ivar time: a six or nine digit string denoting hhmmss (or strftime
+        %H%M%S%f) or hhmmssuuu, similar to the first, but where the trailing
+        three digits are miliseconds.
+        :ivar instrument: A three character sequence denoting the instrument.
+        """
+        
 
-
+    def __repr__(self):
+        print(f"<VISDS Raw Product with raw_product_ID: {self.raw_product_id}>")
+        return(f"<VISDS Raw Product with raw_product_ID: {self.raw_product_id}>")
 

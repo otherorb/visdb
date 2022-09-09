@@ -1,7 +1,6 @@
+""" This is the program used to clean up after a database.
+There's minimal checking of commands here.
 """
-Various vipersci database utilities.
-"""
-
 
 # Copyright 2022, United States Government as represented by the
 # Administrator of the National Aeronautics and Space Administration.
@@ -55,6 +54,12 @@ def arg_parser():
             help="Table name to drop. Or 'all' to drop all tables."
     )
     parser.add_argument(
+            "-r", "--refresh",
+            action='store_true',
+            help="Refresh the database: \
+                    remove all tables and set db to original configuration."
+    )
+    parser.add_argument(
             "-c", "--config",
             type=Path,
             help="Path to database configuration file."
@@ -75,8 +80,10 @@ def get_engine(url):
     engine = create_engine(url, echo=True)
     return(engine)
 
-""" Read database configuration file."""
 def new_db(fname):
+    """ Create a new database connection from a yaml configuration file.
+    """
+
     with open(fname, 'r') as f:
         conf_text = f.read()
         
@@ -93,26 +100,34 @@ def new_db(fname):
     url = f'{db_type}://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}'
 
     engine = get_engine(url)
+    print("\n\n\n**************************")
+    print(engine.url)
+    print("**************************\n\n\n")
     Base = orm.declarative_base()
     Base.metadata.create_all(engine)
     return(Base, engine, db)
 
+def refresh_db(engine, Base):
+    """Call postgresql commands directly. This is messy as all hell, but
+    I couldn't get the ORM to clean up the database any other way."""
+    uname = engine.url.username
+    db_refresh_command = "DROP SCHEMA public CASCADE;"\
+        "CREATE SCHEMA public;"\
+        "GRANT ALL ON SCHEMA public TO "+uname+";"\
+        "GRANT ALL ON SCHEMA public TO public;"\
+        "COMMENT ON SCHEMA public IS 'standard public schema';"
+    print(db_refresh_command)
+    engine.execute(db_refresh_command)
+
+
 """ Drop database tables."""
 def drop_db_table(table_name, engine, Base):
-    metadata = MetaData(engine)
-    print(table_name)
-    table_to_drop = metadata.tables.get(table_name)
-    print(table_to_drop)
     if table_name == "all":
-        logging.info('Deleting all tables')
-        Base.metadata.drop_all(engine)
+        """This is treated as if the user called --refresh"""
+        refresh_db(engine, Base)
     elif table_to_drop is not None:
         try:
-            Base.metadata.drop_all(engine, table_to_drop, checkfirst=True)
-            logging.info(f'Attempting to delete {table_to_drop} table')
-            print("*****************************************")
-            print(f"DELETED table {table_to_drop}!!!!")
-            print("*****************************************")
+            engine.execute(f"DROP TABLE IF EXISTS {table_name};")
         except Exception as e:
             logging.error(e)
 
@@ -169,6 +184,9 @@ if __name__ == "__main__":
     if args.list:
         db_tables = list_db_tables(Base, engine)
         print(db_tables)
+
+    if args.refresh:
+        refresh_db(engine, Base)
 
     if args.drop:
         print("*****************************************")
