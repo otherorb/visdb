@@ -1,0 +1,41 @@
+{
+    "lid": "urn:nasa:pds:viper.is:raw:v0123456-ncl",
+    "vid": 0.1,
+    "inst_name": "NavCam Left",
+    "product_id": "v0123456-ncl",
+    "modification_details": [
+        {
+        "version": 0.1,
+        "date": "2021-03-31",
+        "description": "Illegal version number for testing"
+        }
+    ],
+    "start_time": "2024-01-27T06:30:00Z",
+    "stop_time": "2024-01-27T06:30:00Z",
+    "mission_lid": "urn:nasa:pds:viper",
+    "sc_lid": "urn:nasa:pds:context:instrument_host:spacecraft.viper",
+    "inst_lid": "urn:nasa:pds:context:instrument_host:spacecraft.viper.navcam",
+    "bad_pixel_table_id": 1,
+    "exposure": 2,
+    "lights": [
+        {"name": "NavLight Left", "wavelength": 450},
+        {"name": "NavLight Right", "wavelength": 450}
+    ],
+    "compression": "Lossless",
+    "inst_temp": 30,
+    "mission_phase": "TEST",
+    "software": [
+        {
+            "name": "VIS procssing software",
+            "version": "0.1",
+            "type": "Python",
+            "programs": [
+                {"name": "create-raw"}
+            ]
+        }
+    ],
+    "file_creation_datetime": "2024-02-01T01:02:03Z",
+    "file_checksum": "0123456789abcdefABCDEF1234567890",
+    "lines": 2048,
+    "samples": 2048
+}

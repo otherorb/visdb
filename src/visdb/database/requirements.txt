@@ -1,0 +1,11 @@
+yaml
+geos
+numpy
+psycopg2
+sqlalchemy
+geopandas
+postgis
+sqlalchemy-utils
+dagit
+dagster
+jupyterlab
