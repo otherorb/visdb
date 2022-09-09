@@ -81,15 +81,13 @@ def new_db(fname):
         conf_text = f.read()
         
     db = yaml.load(conf_text, Loader=yaml.FullLoader)
-    print(db)
 
-    db_host = db['db_host']
-    db_host = db['db_host']
-    db_port = db['db_port']
-    db_name = db['db_name']
-    db_user = db['db_user']
-    db_pass = db['db_pass']
-    db_type = db['db_type']
+    db_host = 'localhost'
+    db_port=db['services']['postgres']['ports'][0].split(":")[0] 
+    db_user=db['services']['postgres']['environment'][0].split("=")[1] 
+    db_pass=db['services']['postgres']['environment'][1].split("=")[1] 
+    db_name=db['services']['postgres']['environment'][2].split("=")[1]
+    db_type='postgresql'
     url = f'{db_type}://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}'
 
     engine = get_engine(url)
@@ -157,14 +155,6 @@ if __name__ == "__main__":
 
     inspector = inspect(engine)
     table_names = inspector.get_table_names()
-
-    print("*****************************************")
-    print("*****************************************")
-    print("*****************************************")
-    print(table_names)
-    print("*****************************************")
-    print("*****************************************")
-    print("*****************************************")
 
     if args.list:
         db_tables = list_db_tables(Base, engine)

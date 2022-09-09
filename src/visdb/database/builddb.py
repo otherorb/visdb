@@ -16,23 +16,29 @@ from db_utility import *
 if __name__ == "__main__":
 
     """ Need to be able to read from: database, yamcs, and PDS label (xml)
-        Read database configuration from 'local_db_settings.yml'
+        Read database configuration from 'docker-compose.yml' 
         Build the database URL using these settings. 
     """
 
-    with open('local_db_settings.yml') as settings_f:
-        db = yaml.load(settings_f, Loader=yaml.FullLoader)
+    #with open('docker-compose.yml') as settings_f:
+    #    db = yaml.load(settings_f, Loader=yaml.FullLoader)
+#
+#    db_host = 'localhost'
+#    db_port=db['services']['postgres']['ports'][0].split(":")[0] 
+#    db_user=db['services']['postgres']['environment'][0].split("=")[1] 
+#    db_pass=db['services']['postgres']['environment'][1].split("=")[1] 
+#    db_name=db['services']['postgres']['environment'][2].split("=")[1]
+#    url = f'postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}'
+#
+#    engine = get_engine(url)
+#    Base = orm.declarative_base()
 
-    db_host = db['db_host']
-    db_port = db['db_port']
-    db_name = db['db_name']
-    db_user = db['db_user']
-    db_pass = db['db_pass']
-    url = f'postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}'
+    args = arg_parser().parse_args()
+    util.set_logger(args.verbose)
 
-    engine = get_engine(url)
-    Base = orm.declarative_base()
-    Base.metadata.create_all(engine)
+    db_config = args.config
+
+    Base, engine, db = new_db(db_config)
 
     """ Set up some simple checks for now..."""
     start_time = datetime.datetime.now()
