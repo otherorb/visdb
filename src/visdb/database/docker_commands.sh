@@ -17,9 +17,16 @@
 
 
 # Create a new postgres docker container using the image available in Docker's 
-# service. This relies on the existing docker-compose file in this directory. 
+# service. This relies on the existing docker-compose.yml file in this directory. 
 # 
+# This command simply pulls the postgres image from docker hub. This is helpful, but it
+# does not spin up the container. 
 - docker-compose pull
+
+# If the image is here (for example from the previous pull command), this command 
+# spins up the container. If the image isn't downloaded from the docker hub,
+# this also pulls that image down. 
+- docker-compose up -d
 
 # Find the docker container that is a postgresql service
 - docker ps -a | grep -i postgres
@@ -33,9 +40,7 @@
 # Delete the docker image that is a postgresql service:
 - docker rmi --force $(docker images | grep -i postgres | awk '{print $3}')
 
-# Need superuser privileges to do the following:
-# Delete the db-data directory
-- sudo rm -rf db-data
-
 # Delete the postgres-data directory
 - sudo rm -rf postgres-data
+# Delete the postgres transaction log directory
+- sudo rm -rf pgdata

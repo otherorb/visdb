@@ -1,7 +1,7 @@
 ---
 db_host: localhost
 db_port: 5438
-db_name: visds_db
+db_name: visdb
 db_path: ~
 db_user: viper
 db_pass: viper
