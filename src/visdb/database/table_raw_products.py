@@ -25,50 +25,29 @@
 # The AUTHORS file and the LICENSE file are at the
 # top level of this library.
 
-import argparse
 import sys
 import os
-import sqlalchemy as sql
 from sqlalchemy import orm
 from sqlalchemy import Integer, String, Text, Column, Boolean, Float, Identity, DateTime
-from sqlalchemy import select, table, create_engine
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import validates
-import datetime
-import yaml
-from sqlalchemy_utils import database_exists, create_database
-from sqlalchemy.ext.declarative import as_declarative, declared_attr
+from sqlalchemy.ext.hybrid import hybrid_property
+
+sys.path.insert(1, os.path.join(sys.path[0], '../..'))
+from vipersci.pds.pid import VISID, vis_instruments, vis_compression
+
 
 Base = orm.declarative_base()
 
+
 class Raw_Product(Base):
-    """ Note that SQLAlchemy will default the table name to the name of the 
+    """ Note that SQLAlchemy will default the table name to the name of the
     class. We want the class to provide a single instance (object) whereas
     the table is the full table of all of these objects. To that end, we
     use the plural for the table name and the singular for the class name.
     """
     __tablename__ = 'Raw_Products'
 
-    """ It's not clear whether I should use CheckConstraint or a validator.
-    Personally I feel a validation method or methods would be nicer, but 
-    that doesn't seem to work when 'automagically' after the object is 
-    constructed, which might mean the need for another pile of methods to
-    check constratins whenever we need them. However, CheckConstraint is 
-    not database agnostic, so if we decided to use some other database, then 
-    we could end up with problematic columns if the CheckConstraint calls 
-    aren't also updated."""
-    #__table_args__ = (
-            #CheckConstraint("file_creation_datetime > stop_time", 
-            #    name="file creation younger than stop_time"),
-            #CheckConstraint("stop_time > start_time", name="stop_time after start_time"),
-            #CheckConstraint(instrument_name.in_(["NavCam Left","NavCam Right","AftCam Left", 
-            #             "AftCam Right","HazCam Port Front","HazCam Port Back", 
-            #             "HazCam Starboard Front","HazCam Starboard Back"]), 
-            #             name="instrument name check"),
-            #)
-
-    id = Column(Integer, Identity(start=1), primary_key = True)
-    raw_product_id = Column(String, nullable=False)
+    id = Column(Integer, Identity(start=1), primary_key=True)
+    _pid = Column("product_id", String, nullable=False)
     instrument_name = Column(String, nullable=False)
     start_time = Column(DateTime, nullable=False)
     stop_time = Column(DateTime, nullable=False)
@@ -104,125 +83,87 @@ class Raw_Product(Base):
     source_file_name = Column(String, nullable=False)
     pixel_bits = Column(Integer, nullable=False)
 
-    """ Removing the validators from the class for now. Trying to decide if 
-    they're the best way to go; maybe not. According to some, the database 
-    should be doing the validating, not sqlAlchemy.
-    
-    @validates(raw_product_id,
-                mission_lid,
-                sc_lid,
-                bad_pixel_table_id,
-                exposure,
-                compression_ratio,
-                instrument_temperature,
-                mission_phase,
-                software_name,
-                software_version,
-                software_program_name,
-                file_checksum,
-                lines,
-                samples,
-                pathname,
-                source_file_name,
-                pixel_bits)
-    def _is_valid(self, key, value):
-        assert value != None
-        assert value != ''
-        print(value)
-        return(value)
-    
-    @validates(NavLight_Left_On,
-               NavLight_Right_On,
-               HazLight_U_On,
-               HazLight_V_On,
-               HazLight_W_On,
-               HazLight_X_On,
-               HazLight_Y_On,
-               HazLight_Z_On)
-    def _is_valid_boolean(self, key, value):
-        assert value != None
-        assert isinstance(value, bool)
-        return(value)
-    
-    @validates(instrument_name)
-    def _is_valid_instrument_name(self, key, inst_name):
-        assert inst_name != None
-        assert inst_name != ''
-        print(inst_name)
-        assert inst_name in ["NavCam Left", "NavCam Right", "AftCam Left", 
-                         "AftCam Right", "HazCam Port Front", "HazCam Port Back", 
-                         "HazCam Starboard Front", "HazCam Starboard Back"]
-        return(inst_name)
+    def __init__(self, **kwargs):
+        print("in init")
+        if "product_id" in kwargs:
+            pid = VISID(kwargs["product_id"])
 
-    #@validates('start_time')
-    #def _is_valid_start_time(self, key, start_time):
-    #    assert start_time != None
-    #    assert isinstance(start_time, datetime.datetime)
-    #    assert start_time > datetime.datetime(2022,1,1)
-    #    return(start_time)
-    
-    @validates(start_time, stop_time)
-    def _is_valid_start_stop_time(self, start_time, stop_time):
-        assert stop_time != None
-        assert start_time != None
-        print("In validation step, ", start_time)
-        print("Here start_time is a ", type(start_time))
-        assert isinstance(start_time, datetime.datetime)
-        assert isinstance(stop_time, datetime.datetime)
-        assert stop_time > start_time
-        return(start_time, stop_time)
-    
-    @validates(file_creation_datetime)
-    def _is_valid_file_creation_datetime(self, key, file_creation_time, stop_time):
-        assert file_creation_time != Null
-        assert isinstance(file_creation_time, datetime.datetime)
-        assert file_creation_time > stop_time
-        return(file_creation_time)
-    
-    @validates(compression_type)
-    def _is_valid_compression_type(self, key, compression_type):
-        assert compression_type != None
-        assert compression_type in ["Lossless", "ICER"]
-        return(compression_type)
-    """
+            if "start_time" in kwargs and pid.datetime() != kwargs["start_time"]:
+                raise ValueError(
+                    f"The product_id datetime ({pid.datetime()}) and the "
+                    f"provided start_time ({kwargs['start_time']}) disagree."
+                )
 
+            if (
+                "instrument_name" in kwargs and not (
+                    vis_instruments[pid.instrument] == kwargs["instrument_name"] or
+                    pid.instrument == kwargs["instrument_name"]
+                )
+            ):
+                raise ValueError(
+                    f"The product_id instrument code ({pid.instrument}) and "
+                    f"the provided instrument_name "
+                    f"({kwargs['instrument_name']}) disagree."
+                )
 
+            if (
+                "compression_ratio" in kwargs and not (
+                    vis_compression[pid.compression] == kwargs["compression_ratio"] or
+                    pid.compression == kwargs["compression_ratio"]
+                )
+            ):
+                raise ValueError(
+                    f"The product_id compression code ({pid.compression}) and "
+                    f"the provided compression_ratio "
+                    f"({kwargs['compression_ratio']}) disagree."
+                )
+
+            # Need another one of these if-statements for compression_type, but
+            # need to modify pid.py first.
+
+            # Final cleanup so that super() works later.
+            del kwargs["product_id"]
+        elif (
+            kwargs.keys() >= {
+                "start_time", "instrument_name", "compression_ratio"
+            }
+        ):
+            pid = VISID(
+                kwargs["start_time"].date(),
+                kwargs["start_time"].time(),
+                # Need to update pid.py to take long-form of these two params.
+                kwargs["instrument_name"],
+                kwargs["compression_ratio"]
+            )
+        else:
+            raise ValueError(
+                "Either product_id must be given, or each of start_time, "
+                "instrument_name, and compression_ratio."
+            )
+
+        super().__init__(**kwargs)
+        self.product_id = pid
+
+        return
+
+    @hybrid_property
+    def product_id(self):
+        return VISID(self._pid)
+
+    @product_id.setter
+    def product_id(self, pid):
+        vid = VISID(pid)
+        self._pid = str(vid)
+        self.start_time = vid.datetime()
+        self.instrument_name = vis_instruments[vid.instrument]
+        self.compression_ratio = vis_compression[vid.compression]
 
     def emit_pds_label():
         """This should pull from Ross's code when it's been updated."""
+        # As discussed, this functionality belongs elsewhere, remove.
         pass
 
-    def product_id(self):
-        """Use the pid.py module to add methods and classes to 
-        this object.
-        """
-        sys.path.insert(1, os.path.join(sys.path[0],'../..'))
-        from vipersci.pds import pid
-
-        """ Try to create an observation id using the start_time (datetime object)
-        and the instrument name"""
-        start_date = self.start_time.date()
-        start_hhmmss = self.start_time.time()
-        inst_name = self.instrument_name.lower()
-
-        self.raw_product_id = pid.VISID(start_date, start_hhmmss, 
-                                inst_name, self.compression_type).__str__()
-        print(self.raw_product_id)
-        return(self.raw_product_id)
-
-        """
-        This is opied from the pid.py module imported above, mostly for 
-        documentation purposes here.
-        :ivar date: a six digit string denoting YYMMDD (or strftime %y%m%d) where
-        the two digit year can be prefixed with "20" to get the four-digit year.
-        :ivar time: a six or nine digit string denoting hhmmss (or strftime
-        %H%M%S%f) or hhmmssuuu, similar to the first, but where the trailing
-        three digits are miliseconds.
-        :ivar instrument: A three character sequence denoting the instrument.
-        """
-        
-
     def __repr__(self):
+        # This is not what a __repr__() should do.  Let's remove for now.
         print(f"<VISDS Raw Product with raw_product_ID: {self.raw_product_id}>")
         return(f"<VISDS Raw Product with raw_product_ID: {self.raw_product_id}>")
-
